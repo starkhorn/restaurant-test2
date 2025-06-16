@@ -443,8 +443,11 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 
-server.listen(PORT, () => {
-  console.log(`Restaurant Management System running on port ${PORT}`);
-});
+// Only start server if this file is run directly (not required)
+if (require.main === module) {
+  server.listen(PORT, () => {
+    console.log(`Restaurant Management System running on port ${PORT}`);
+  });
+}
 
-module.exports = { app, io, db };
+module.exports = { app, io, db, server };
