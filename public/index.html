@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Restaurant Management System</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Restaurant Menu & Order Management System</h1>
+            <p>Digital ordering platform for modern restaurants</p>
+        </header>
+
+        <main>
+            <div class="interface-grid">
+                <div class="interface-card">
+                    <h2>👨‍🍳 Admin Panel</h2>
+                    <p>Manage menu items, categories, and restaurant settings</p>
+                    <a href="/admin" class="btn btn-primary">Access Admin Panel</a>
+                </div>
+
+                <div class="interface-card">
+                    <h2>🧾 Kitchen Display</h2>
+                    <p>View incoming orders and update order status</p>
+                    <a href="/kitchen" class="btn btn-primary">Kitchen Display System</a>
+                </div>
+
+                <div class="interface-card">
+                    <h2>💰 Cashier</h2>
+                    <p>Process payments and manage table billing</p>
+                    <a href="/cashier" class="btn btn-primary">Cashier Interface</a>
+                </div>
+
+                <div class="interface-card">
+                    <h2>📱 Customer Menu</h2>
+                    <p>Mobile-friendly menu for customer ordering</p>
+                    <a href="/menu?table=1" class="btn btn-secondary">View Sample Menu</a>
+                </div>
+            </div>
+
+            <div class="qr-section">
+                <h2>QR Code Generation</h2>
+                <p>Generate QR codes for tables to enable customer ordering</p>
+                <div class="qr-generator">
+                    <label for="tableNumber">Table Number:</label>
+                    <input type="number" id="tableNumber" min="1" max="99" value="1">
+                    <button onclick="generateQR()" class="btn btn-primary">Generate QR Code</button>
+                </div>
+                <div id="qrResult" class="qr-result"></div>
+            </div>
+        </main>
+
+        <footer>
+            <p>&copy; 2024 Restaurant Management System v1.0</p>
+        </footer>
+    </div>
+
+    <script>
+        async function generateQR() {
+            const tableNumber = document.getElementById('tableNumber').value;
+            if (!tableNumber) {
+                alert('Please enter a table number');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/tables/${tableNumber}/qr`);
+                const data = await response.json();
+                
+                document.getElementById('qrResult').innerHTML = `
+                    <div class="qr-display">
+                        <h3>Table ${tableNumber} QR Code</h3>
+                        <img src="${data.qrCode}" alt="QR Code for Table ${tableNumber}">
+                        <p>Menu URL: <a href="${data.menuUrl}" target="_blank">${data.menuUrl}</a></p>
+                        <button onclick="printQR()" class="btn btn-secondary">Print QR Code</button>
+                    </div>
+                `;
+            } catch (error) {
+                alert('Error generating QR code: ' + error.message);
+            }
+        }
+
+        function printQR() {
+            const qrDisplay = document.querySelector('.qr-display');
+            const printWindow = window.open('', '', 'width=400,height=400');
+            printWindow.document.write(`
+                <html>
+                <head><title>Table QR Code</title></head>
+                <body style="text-align: center; font-family: Arial, sans-serif;">
+                    ${qrDisplay.innerHTML}
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+            printWindow.print();
+        }
+    </script>
+</body>
+</html>

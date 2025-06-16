@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - Restaurant Management</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Admin Panel</h1>
+            <p>Manage menu items, categories, and restaurant settings</p>
+            <a href="/" class="btn btn-secondary">← Back to Home</a>
+        </header>
+
+        <main>
+            <div class="admin-tabs">
+                <button class="tab-btn active" onclick="showTab('categories')">Categories</button>
+                <button class="tab-btn" onclick="showTab('menu-items')">Menu Items</button>
+            </div>
+
+            <!-- Categories Tab -->
+            <div id="categories-tab" class="tab-content active">
+                <div class="section-header">
+                    <h2>Food Categories</h2>
+                    <button class="btn btn-primary" onclick="showAddCategoryForm()">+ Add Category</button>
+                </div>
+
+                <div id="add-category-form" class="form-container" style="display: none;">
+                    <h3>Add New Category</h3>
+                    <form onsubmit="addCategory(event)">
+                        <div class="form-group">
+                            <label>Category Name (English):</label>
+                            <input type="text" id="categoryName" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Category Name (Thai):</label>
+                            <input type="text" id="categoryNameThai">
+                        </div>
+                        <div class="form-group">
+                            <button type="submit" class="btn btn-success">Add Category</button>
+                            <button type="button" class="btn btn-secondary" onclick="hideAddCategoryForm()">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div id="categories-list" class="loading">Loading categories...</div>
+            </div>
+
+            <!-- Menu Items Tab -->
+            <div id="menu-items-tab" class="tab-content">
+                <div class="section-header">
+                    <h2>Menu Items</h2>
+                    <button class="btn btn-primary" onclick="showAddItemForm()">+ Add Menu Item</button>
+                </div>
+
+                <div id="add-item-form" class="form-container" style="display: none;">
+                    <h3>Add New Menu Item</h3>
+                    <form onsubmit="addMenuItem(event)" enctype="multipart/form-data">
+                        <div class="form-group">
+                            <label>Item Name (English):</label>
+                            <input type="text" id="itemName" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Item Name (Thai):</label>
+                            <input type="text" id="itemNameThai">
+                        </div>
+                        <div class="form-group">
+                            <label>Description:</label>
+                            <textarea id="itemDescription" rows="3"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Price (฿):</label>
+                            <input type="number" id="itemPrice" step="0.01" min="0" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Category:</label>
+                            <select id="itemCategory" required>
+                                <option value="">Select a category</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Image:</label>
+                            <input type="file" id="itemImage" accept="image/*">
+                        </div>
+                        <div class="form-group">
+                            <label>Status:</label>
+                            <select id="itemStatus">
+                                <option value="available">Available</option>
+                                <option value="sold-out">Temporarily Sold Out</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <button type="submit" class="btn btn-success">Add Menu Item</button>
+                            <button type="button" class="btn btn-secondary" onclick="hideAddItemForm()">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div id="menu-items-list" class="loading">Loading menu items...</div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        let categories = [];
+
+        // Tab functionality
+        function showTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            
+            document.getElementById(tabName + '-tab').classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // Load data on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadCategories();
+            loadMenuItems();
+        });
+
+        // Categories functionality
+        async function loadCategories() {
+            try {
+                const response = await fetch('/api/categories');
+                categories = await response.json();
+                displayCategories();
+                updateCategorySelect();
+            } catch (error) {
+                document.getElementById('categories-list').innerHTML = '<div class="error">Error loading categories</div>';
+            }
+        }
+
+        function displayCategories() {
+            const container = document.getElementById('categories-list');
+            if (categories.length === 0) {
+                container.innerHTML = '<p>No categories found. Add your first category!</p>';
+                return;
+            }
+
+            container.innerHTML = `
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name (English)</th>
+                            <th>Name (Thai)</th>
+                            <th>Created</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${categories.map(cat => `
+                            <tr>
+                                <td>${cat.id}</td>
+                                <td>${cat.name}</td>
+                                <td>${cat.name_thai || '-'}</td>
+                                <td>${new Date(cat.created_at).toLocaleDateString()}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        function updateCategorySelect() {
+            const select = document.getElementById('itemCategory');
+            select.innerHTML = '<option value="">Select a category</option>';
+            categories.forEach(cat => {
+                select.innerHTML += `<option value="${cat.id}">${cat.name}</option>`;
+            });
+        }
+
+        function showAddCategoryForm() {
+            document.getElementById('add-category-form').style.display = 'block';
+        }
+
+        function hideAddCategoryForm() {
+            document.getElementById('add-category-form').style.display = 'none';
+            document.getElementById('categoryName').value = '';
+            document.getElementById('categoryNameThai').value = '';
+        }
+
+        async function addCategory(event) {
+            event.preventDefault();
+            
+            const name = document.getElementById('categoryName').value;
+            const name_thai = document.getElementById('categoryNameThai').value;
+
+            try {
+                const response = await fetch('/api/categories', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, name_thai })
+                });
+
+                if (response.ok) {
+                    hideAddCategoryForm();
+                    loadCategories();
+                    showMessage('Category added successfully!', 'success');
+                } else {
+                    throw new Error('Failed to add category');
+                }
+            } catch (error) {
+                showMessage('Error adding category: ' + error.message, 'error');
+            }
+        }
+
+        // Menu Items functionality
+        async function loadMenuItems() {
+            try {
+                const response = await fetch('/api/menu-items');
+                const menuItems = await response.json();
+                displayMenuItems(menuItems);
+            } catch (error) {
+                document.getElementById('menu-items-list').innerHTML = '<div class="error">Error loading menu items</div>';
+            }
+        }
+
+        function displayMenuItems(items) {
+            const container = document.getElementById('menu-items-list');
+            if (items.length === 0) {
+                container.innerHTML = '<p>No menu items found. Add your first menu item!</p>';
+                return;
+            }
+
+            container.innerHTML = `
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Image</th>
+                            <th>Name</th>
+                            <th>Category</th>
+                            <th>Price</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${items.map(item => `
+                            <tr>
+                                <td>
+                                    ${item.image_url ? 
+                                        `<img src="${item.image_url}" alt="${item.name}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 5px;">` : 
+                                        '<div style="width: 50px; height: 50px; background: #f0f0f0; border-radius: 5px; display: flex; align-items: center; justify-content: center;">No Image</div>'
+                                    }
+                                </td>
+                                <td>
+                                    <strong>${item.name}</strong>
+                                    ${item.name_thai ? `<br><small>${item.name_thai}</small>` : ''}
+                                </td>
+                                <td>${item.category_name || 'No Category'}</td>
+                                <td>฿${parseFloat(item.price).toFixed(2)}</td>
+                                <td>
+                                    <span class="status-badge status-${item.status}">${item.status}</span>
+                                </td>
+                                <td>
+                                    <button class="btn btn-warning" onclick="toggleItemStatus(${item.id}, '${item.status}')">
+                                        ${item.status === 'available' ? 'Mark Sold Out' : 'Mark Available'}
+                                    </button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        function showAddItemForm() {
+            document.getElementById('add-item-form').style.display = 'block';
+        }
+
+        function hideAddItemForm() {
+            document.getElementById('add-item-form').style.display = 'none';
+            document.querySelector('#add-item-form form').reset();
+        }
+
+        async function addMenuItem(event) {
+            event.preventDefault();
+            
+            const formData = new FormData();
+            formData.append('name', document.getElementById('itemName').value);
+            formData.append('name_thai', document.getElementById('itemNameThai').value);
+            formData.append('description', document.getElementById('itemDescription').value);
+            formData.append('price', document.getElementById('itemPrice').value);
+            formData.append('category_id', document.getElementById('itemCategory').value);
+            formData.append('status', document.getElementById('itemStatus').value);
+            
+            const imageFile = document.getElementById('itemImage').files[0];
+            if (imageFile) {
+                formData.append('image', imageFile);
+            }
+
+            try {
+                const response = await fetch('/api/menu-items', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    hideAddItemForm();
+                    loadMenuItems();
+                    showMessage('Menu item added successfully!', 'success');
+                } else {
+                    throw new Error('Failed to add menu item');
+                }
+            } catch (error) {
+                showMessage('Error adding menu item: ' + error.message, 'error');
+            }
+        }
+
+        async function toggleItemStatus(itemId, currentStatus) {
+            const newStatus = currentStatus === 'available' ? 'sold-out' : 'available';
+            
+            try {
+                const response = await fetch(`/api/menu-items/${itemId}/status`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: newStatus })
+                });
+
+                if (response.ok) {
+                    loadMenuItems();
+                    showMessage(`Item status updated to ${newStatus}!`, 'success');
+                } else {
+                    throw new Error('Failed to update item status');
+                }
+            } catch (error) {
+                showMessage('Error updating item status: ' + error.message, 'error');
+            }
+        }
+
+        function showMessage(message, type) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = type;
+            messageDiv.textContent = message;
+            
+            document.querySelector('main').insertBefore(messageDiv, document.querySelector('main').firstChild);
+            
+            setTimeout(() => {
+                messageDiv.remove();
+            }, 5000);
+        }
+    </script>
+
+    <style>
+        .admin-tabs {
+            display: flex;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #eee;
+        }
+
+        .tab-btn {
+            padding: 12px 24px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            color: #666;
+            border-bottom: 3px solid transparent;
+        }
+
+        .tab-btn.active {
+            color: #007bff;
+            border-bottom-color: #007bff;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .form-container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+        }
+
+        .form-container h3 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+    </style>
+</body>
+</html>
